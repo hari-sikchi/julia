@@ -315,6 +315,8 @@ function contains_is(itr, x::ANY)
     return false
 end
 
+anymap(f::Function, a::Array{Any,1}) = Any[ f(a[i]) for i=1:length(a) ]
+
 _topmod(sv::InferenceState) = _topmod(sv.mod)
 _topmod(m::Module) = ccall(:jl_base_relative_to, Any, (Any,), m)::Module
 
@@ -658,7 +660,8 @@ function limit_type_depth(t::ANY, d::Int, cov::Bool=true, var::Union{Void,TypeVa
         if d > MAX_TYPE_DEPTH
             return Any
         end
-        return Union{map(x->limit_type_depth(x, d+1, cov, var), (t.a,t.b))...}
+        return Union{limit_type_depth(t.a, d+1, cov, var),
+                     limit_type_depth(t.b, d+1, cov, var)}
     elseif isa(t,UnionAll)
         v = t.var
         if v.ub === Any
@@ -1070,7 +1073,7 @@ function builtin_tfunction(f::ANY, argtypes::Array{Any,1}, sv::InferenceState)
                 return tuple_tfunc(limit_tuple_depth(sv.params, argtypes_to_type(argtypes)))
             end
         end
-        return Const(tuple(map(a->a.val, argtypes)...))
+        return Const(tuple(anymap(a->a.val, argtypes)...))
     elseif f === svec
         return SimpleVector
     elseif f === arrayset
@@ -1511,7 +1514,7 @@ function pure_eval_call(f::ANY, argtypes::ANY, atype::ANY, vtypes::VarTable, sv:
     end
 end
 
-argtypes_to_type(argtypes::Array{Any,1}) = Tuple{map(widenconst, argtypes)...}
+argtypes_to_type(argtypes::Array{Any,1}) = Tuple{anymap(widenconst, argtypes)...}
 
 _Pair_name = nothing
 function Pair_name()
